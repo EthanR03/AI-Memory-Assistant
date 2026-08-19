@@ -3,3 +3,14 @@ venv/
 __pycache__/
 *.pyc
 chroma_db/
+
+# Derived artefacts - both are rebuilt from the PDF by:
+#   python scripts/extract_pdf.py data/2026-Record-and-Fact-Book.pdf \
+#       --out data/extracted/factbook.pypdf.txt
+#   python -m src.nfl.build
+data/extracted/
+data/nflverse/
+nfl.db
+
+# The source PDF is ~22 MB; keep it out of git history.
+data/*.pdf

@@ -1,0 +1,13 @@
+# RAG pipeline (src/ingest.py, src/ask.py)
+chromadb==1.5.9
+openai==2.41.0
+python-dotenv==1.2.2
+
+# PDF extraction for the NFL predictor (scripts/extract_pdf.py)
+# pypdf is the fast default; pdfplumber's layout mode is for re-checking
+# the column-aligned statistics matrices on pdf 257-260.
+pypdf==6.16.1
+pdfplumber==0.11.10
+
+# Stage 2: downloading nflverse games.csv (src/nfl/nflverse.py)
+requests>=2.31

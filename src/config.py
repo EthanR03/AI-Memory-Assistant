@@ -29,3 +29,22 @@ CHUNK_OVERLAP = 150    # characters each chunk shares with its neighbour
 
 # --- Vector store --------------------------------------------------------
 COLLECTION_NAME = "memories"
+
+# --- NFL predictor -------------------------------------------------------
+# Text extracted from the Record & Fact Book PDF (see scripts/extract_pdf.py)
+# and the SQLite feature store the parsers build from it.
+EXTRACTED_DIR = DATA_DIR / "extracted"
+FACTBOOK_TXT = EXTRACTED_DIR / "factbook.pypdf.txt"
+NFL_DB = PROJECT_ROOT / "nfl.db"
+
+# Stage 2: nflverse game data (results + closing lines, 1999-present).
+NFLVERSE_DIR = DATA_DIR / "nflverse"
+NFLVERSE_GAMES = NFLVERSE_DIR / "games.csv"
+
+# The book's data is frozen at this date; anything later (cuts, trades,
+# injuries) is NOT in it. Worth surfacing in any answer built on it.
+FACTBOOK_AS_OF = "2026-07-14"
+
+# Season anchors: the Wednesday on/before each season's first game. Used to
+# derive week numbers from the bare dates the book prints.
+SEASON_ANCHORS = {2025: "2025-09-03", 2026: "2026-09-09"}
