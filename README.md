@@ -81,6 +81,26 @@ store.
 ## What is not in git
 
 `.gitignore` keeps out the 22 MB source PDF, the extracted text,
-`data/nflverse/`, `nfl.db`, `chroma_db/` and `.env`. Everything derived
-is rebuilt by the commands above; the two inputs you supply yourself are
-the Fact Book PDF (into `data/`) and your OpenAI key (into `.env`).
+`nfl.db`, `chroma_db/` and `.env`. Everything derived is rebuilt by the
+commands above.
+
+`data/nflverse/games.csv` (~2 MB) *is* committed, so a fresh clone can
+build a working store with no network access and no PDF:
+
+```bash
+python -m src.nfl.enrich     # seeds the 32 clubs, loads 7,548 games
+python -m src.nfl.ratings    # full backtest, identical numbers
+```
+
+Skipping the Fact Book costs you the cross-validation step (there is no
+second source to check against), the statistics matrices, venues,
+coaching histories and QB records — so `src.nfl.validate` reports 15/16
+there, failing only the check that wants `team_season_stats` populated.
+Everything the model itself reads comes from nflverse.
+
+The CSV is a snapshot; refresh it with
+`python -m src.nfl.enrich --force-download` rather than deleting it, and
+expect in-season results and lookahead lines to drift until you do.
+
+The two inputs you supply yourself are the Fact Book PDF (into `data/`)
+and your OpenAI key (into `.env`).

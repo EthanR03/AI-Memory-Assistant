@@ -20,6 +20,7 @@ from collections import defaultdict
 
 from .. import config
 from . import db, nflverse
+from .teams import TEAMS
 
 GAME_COLUMNS = [
     "game_id", "season", "week", "game_type", "round", "game_date", "gametime",
@@ -115,6 +116,24 @@ def cross_validate(pairs: dict) -> list[str]:
     return issues
 
 
+def seed_teams(conn) -> int:
+    """Populate `teams` from the registry if nothing has filled it yet.
+
+    `games.home_team` is a foreign key into `teams`, so the table has to
+    be non-empty before any nflverse row will insert. build.py normally
+    fills it from the club blocks; without the PDF the registry still
+    carries everything except the stadium and coaching columns, which
+    only the Fact Book has and which stay NULL.
+    """
+    if conn.execute("SELECT COUNT(*) FROM teams").fetchone()[0]:
+        return 0
+    with conn:
+        return db.replace_all(conn, "teams", list(TEAMS.values()), [
+            "team_id", "location", "nickname", "full_name",
+            "conference", "division",
+        ])
+
+
 def run(force_download: bool = False) -> None:
     path = nflverse.download(config.NFLVERSE_GAMES, force=force_download)
     incoming = nflverse.load_rows(path)
@@ -122,47 +141,76 @@ def run(force_download: bool = False) -> None:
     print(f"nflverse: {len(incoming):,} games, {seasons[0]}-{seasons[-1]}\n")
 
     conn = db.connect(config.NFL_DB)
+    seeded = seed_teams(conn)
+    if seeded:
+        print(f"Seeded {seeded} teams from the registry "
+              f"(no Fact Book club blocks in the store).")
+
     factbook = [dict(r) for r in conn.execute(
         "SELECT * FROM games WHERE source = 'factbook'")]
+
+    # Without the Fact Book there is nothing to cross-validate against,
+    # but nflverse is self-sufficient for the games table - so load it
+    # anyway rather than refusing. A clone that has games.csv but not the
+    # 22 MB PDF still gets 1999-onward results, closing lines and a
+    # backtest; it just does not get the second opinion on 2025-26.
+    pairs: dict = {}
+    issues: list[str] = []
     if not factbook:
-        print("No Fact Book games found - run `python -m src.nfl.build` first.")
-        return
+        print("No Fact Book games in the store - skipping cross-validation.")
+        print("Run `python -m src.nfl.build` first to enable it.")
+    else:
+        shared = sorted({g["season"] for g in factbook})
+        print(f"Fact Book: {len(factbook)} games, seasons {shared}")
 
-    shared = sorted({g["season"] for g in factbook})
-    print(f"Fact Book: {len(factbook)} games, seasons {shared}")
+        # --- 1. Cross-validate -------------------------------------------
+        overlap = [g for g in incoming if g["season"] in shared]
+        pairs, only_fb, only_nv = _match(factbook, overlap)
+        issues = cross_validate(pairs)
 
-    # --- 1. Cross-validate -----------------------------------------------
-    overlap = [g for g in incoming if g["season"] in shared]
-    pairs, only_fb, only_nv = _match(factbook, overlap)
-    issues = cross_validate(pairs)
-
-    print("\n" + "=" * 72)
-    print("CROSS-VALIDATION: Fact Book vs nflverse")
-    print("=" * 72)
-    print(f"  matched games          : {len(pairs)}")
-    print(f"  only in the Fact Book  : {len(only_fb)}")
-    print(f"  only in nflverse       : {len(only_nv)}")
-    graded = sum(1 for _, (f, n) in pairs.items()
-                 if f["home_score"] is not None and n["home_score"] is not None)
-    print(f"  both sources scored    : {graded}")
-    print(f"  disagreements          : {len(issues)}")
-    for issue in issues[:20]:
-        print(f"    ! {issue}")
-    for g in (only_fb + only_nv)[:10]:
-        src = "factbook" if g in only_fb else "nflverse"
-        print(f"    ! unmatched ({src}): {g['season']} "
-              f"{g['away_team']} @ {g['home_team']}")
+        print("\n" + "=" * 72)
+        print("CROSS-VALIDATION: Fact Book vs nflverse")
+        print("=" * 72)
+        print(f"  matched games          : {len(pairs)}")
+        print(f"  only in the Fact Book  : {len(only_fb)}")
+        print(f"  only in nflverse       : {len(only_nv)}")
+        graded = sum(1 for _, (f, n) in pairs.items()
+                     if f["home_score"] is not None
+                     and n["home_score"] is not None)
+        print(f"  both sources scored    : {graded}")
+        print(f"  disagreements          : {len(issues)}")
+        for issue in issues[:20]:
+            print(f"    ! {issue}")
+        for g in (only_fb + only_nv)[:10]:
+            src = "factbook" if g in only_fb else "nflverse"
+            print(f"    ! unmatched ({src}): {g['season']} "
+                  f"{g['away_team']} @ {g['home_team']}")
 
     # --- 2. Replace the games table --------------------------------------
     # Carry over the few fields only the Fact Book has.
     extras = {n["nflverse_game_id"]: f for _, (f, n) in pairs.items()}
+
+    # A re-run without a preceding build() sees no source='factbook' rows,
+    # because the first enrichment already merged them. Keep what that run
+    # carried over instead of blanking it, so enriching twice is a no-op
+    # rather than a quiet loss of the Fact Book's venues and notes.
+    prior = {r["nflverse_game_id"]: r for r in conn.execute(
+        "SELECT nflverse_game_id, site, note, source FROM games "
+        "WHERE nflverse_game_id IS NOT NULL")}
+
     rows = []
     for g in incoming:
         f = extras.get(g["nflverse_game_id"])
+        was = prior.get(g["nflverse_game_id"])
         row = dict(g)
-        row["site"] = (f or {}).get("site")
-        row["note"] = (f or {}).get("note")
-        row["source"] = "nflverse+factbook" if f else "nflverse"
+        if f:
+            row["site"] = f.get("site")
+            row["note"] = f.get("note")
+            row["source"] = "nflverse+factbook"
+        else:
+            row["site"] = was["site"] if was else None
+            row["note"] = was["note"] if was else None
+            row["source"] = (was["source"] if was else None) or "nflverse"
         row["spread_open"] = None   # nflverse carries one line, not open+close
         row["total_open"] = None
         row["game_id"] = db.game_id(g["season"], g["game_type"], g["week"],

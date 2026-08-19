@@ -4,13 +4,16 @@ __pycache__/
 *.pyc
 chroma_db/
 
-# Derived artefacts - both are rebuilt from the PDF by:
+# Derived artefacts - rebuilt by:
 #   python scripts/extract_pdf.py data/2026-Record-and-Fact-Book.pdf \
 #       --out data/extracted/factbook.pypdf.txt
-#   python -m src.nfl.build
+#   python -m src.nfl.build && python -m src.nfl.enrich
 data/extracted/
-data/nflverse/
 nfl.db
+
+# data/nflverse/games.csv IS committed (~2 MB) so a fresh clone can build
+# the store offline. nflverse.py only re-downloads it on --force-download,
+# so refresh it that way rather than deleting it.
 
 # The source PDF is ~22 MB; keep it out of git history.
 data/*.pdf

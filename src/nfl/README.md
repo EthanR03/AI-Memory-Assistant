@@ -10,14 +10,19 @@ Two data sources feeding one SQLite feature store:
 
 ## Build it
 
+`data/nflverse/games.csv` is committed, so Stage 2 works out of the box.
+Stage 1 needs the Fact Book PDF, which is not in git — without it,
+`enrich` seeds the 32 clubs from `teams.py` and skips cross-validation,
+and everything the model actually reads still gets built.
+
 ```bash
-# Stage 1: PDF -> page-delimited text (~45s) -> nfl.db
+# Stage 1 (optional): PDF -> page-delimited text (~45s) -> nfl.db
 python scripts/extract_pdf.py data/2026-Record-and-Fact-Book.pdf \
     --out data/extracted/factbook.pypdf.txt
 python -m src.nfl.build
 
-# Stage 2: download nflverse, cross-validate, enrich
-python -m src.nfl.enrich
+# Stage 2: load nflverse, cross-validate against Stage 1 if it ran
+python -m src.nfl.enrich                 # --force-download to refresh
 
 # Check everything
 python -m src.nfl.validate
