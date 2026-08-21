@@ -35,7 +35,8 @@ A textbook RAG pipeline, one stage per module, each readable on its own:
 | `embedder.py` | embed with OpenAI `text-embedding-3-small` |
 | `store.py` | upsert into a persistent ChromaDB collection |
 | `retriever.py` | embed the question, pull the nearest chunks |
-| `generator.py` | answer from those chunks *only*, citing the file |
+| `tools.py` | a read-only SQL window onto `nfl.db` |
+| `generator.py` | pick a tool, run it, answer from what came back |
 
 ```bash
 python -m src.ingest                      # build the store (re-runnable)
@@ -43,10 +44,55 @@ python -m src.search "goal of the project"   # see the raw retrieved chunks
 python -m src.ask    "goal of the project"   # get a grounded answer
 ```
 
-`python -m src.ask` with no arguments opens an interactive prompt. The
-generator is instructed to say it has no memory of something rather than
-guess, so a wrong answer is a retrieval bug you can see with
-`src.search`.
+`python -m src.ask` with no arguments opens an interactive prompt.
+
+### One assistant, two backends
+
+`generator.py` is not a fixed pipeline any more. It hands the model two
+tools and lets it choose:
+
+- **`search_notes`** — semantic search over your notes, for what *you*
+  wrote and decided.
+- **`query_nfl_db`** — read-only SQL over the predictor's store, for
+  anything factual about football.
+
+That split is the lesson the Fact Book taught, applied deliberately:
+prose gets retrieved, records get queried. "Which club has the best
+record since 2016" is not a fact stored anywhere — it is two lines of
+SQL, and computing it returns the exact answer where embed-and-recall
+returns a plausible one.
+
+```
+$ python -m src.ask "What NFL team has been the most successful in the last 10 years?"
+The Kansas City Chiefs ... with 135 wins and 53 losses from 2016 to 2025.
+(retrieved from: nfl.db)
+
+$ python -m src.ask "What is the goal of the project?"
+... build a retrieval-based memory assistant ... (source: sample.md)
+(retrieved from: sample.md)
+```
+
+The assistant is told to say it has no memory of something rather than
+guess, so a wrong notes answer is a retrieval bug you can see with
+`src.search`. It is also told that the predictor **has no demonstrated
+edge**, so a forecast is reported as the model's opinion and never as
+betting advice.
+
+The loop runs at `temperature=0` on purpose: at the default, the same
+question wrote different SQL each run and returned 137 wins once and 135
+the next. One of those was wrong, and for query generation there is no
+upside to sampling.
+
+The SQL tool is also usable on its own, which is the easiest way to check
+a query before trusting an answer built on it:
+
+```bash
+python -m src.tools "SELECT COUNT(*) FROM games WHERE played = 1"
+python -m src.tools          # no args: print the schema notes
+```
+
+It opens the store `mode=ro`, so SQLite refuses writes whatever SQL
+arrives — a prompt-injected `DROP` fails at the driver, not at a regex.
 
 Settings — chunk size, overlap, model names, paths — all live in
 `src/config.py`.

@@ -171,8 +171,16 @@ Things that will produce wrong answers if ignored:
   numbers as if one contradicts the other.
 - predictions are WALK-FORWARD: each row was forecast by a model that had
   seen only earlier games, so they can be scored honestly against results.
-  pred_margin and market_margin are both HOME margins in points; edge is
-  pred_margin - market_margin. Join with `JOIN games USING(game_id)`.
+  Join with `JOIN games USING(game_id)`.
+- ALWAYS filter predictions on one model (`WHERE model = 'elo'`), or every
+  game comes back twice. Default to 'elo' unless asked for the other, and
+  SAY which model the numbers came from - 'elo+situational' is the WORSE
+  of the two and must never be served as though it were the main model.
+- pred_margin and market_margin are HOME margins, and edge is
+  pred_margin - market_margin. A NEGATIVE home margin means the AWAY club
+  is favoured: pred_margin = -2.9 for DEN @ KC means the model likes
+  DENVER by 2.9, NOT Kansas City by 2.9. Convert to "AWAY by N" before
+  writing it in prose, or the sentence will contradict itself.
 - IMPORTANT when reporting a pick: this model does NOT beat the market.
   Over 2010-2025 it hit 64.6% against the closing spread's 66.4%, and no
   edge filter clears the 52.4% break-even by more than noise. Report a
