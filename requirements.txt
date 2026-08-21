@@ -11,3 +11,7 @@ pdfplumber==0.11.10
 
 # Stage 2: downloading nflverse games.csv (src/nfl/nflverse.py)
 requests>=2.31
+
+# Stage 3: least squares for the situational tests (src/nfl/situational.py).
+# Only lstsq and some array arithmetic - no scipy, pandas or sklearn.
+numpy>=2.0

@@ -65,6 +65,7 @@ python -m src.nfl.build      # PDF text -> nfl.db
 python -m src.nfl.enrich     # add nflverse, cross-validate the overlap
 python -m src.nfl.validate   # 18 consistency checks
 python -m src.nfl.ratings    # backtest + market tests + 2026 projections
+python -m src.nfl.situational  # are the situational columns mispriced?
 ```
 
 That yields 7,548 games (1999–2026) with closing lines, 32 team blocks,
@@ -72,6 +73,15 @@ That yields 7,548 games (1999–2026) with closing lines, 32 team blocks,
 headline result is negative and stated as such: the model hits 64.6%
 against the market's 66.4% and finds no spread filter that clears
 break-even by more than noise. Measuring that was the point.
+
+Stage 3 then asks whether the market *mis*-prices rest, byes, divisional
+games, roof and weather. On margins it does not — nine features against
+the spread's own residual give R² = 0.0008 and no |t| > 2. On **totals**
+there is one live result: every mph of wind is worth **−0.24 points** the
+closing number does not take out, and the slope replicates almost exactly
+on a held-out half (−0.239 fitted on 2010–17, −0.239 on 2018–25). It is a
+lead rather than a strategy — `wind` is the reading at kickoff, and the
+market prices a forecast.
 
 `scripts/` holds the one-off exploration that shaped the schema —
 `analyze_factbook.py`, `map_team_blocks.py`, `explore_nflverse.py`,
@@ -96,7 +106,15 @@ Skipping the Fact Book costs you the cross-validation step (there is no
 second source to check against), the statistics matrices, venues,
 coaching histories and QB records — so `src.nfl.validate` reports 15/16
 there, failing only the check that wants `team_season_stats` populated.
-Everything the model itself reads comes from nflverse.
+(Two of the 18 checks don't run at all without the book, which is why the
+denominator drops to 16.) Everything the model itself reads comes from
+nflverse.
+
+One honest caveat on that 15/16: the two checks that sum the 2025 games
+against the book's standings page **pass vacuously** on a PDF-less store,
+because `standings` is empty and an empty comparison finds no mismatch.
+They are real checks when the book is loaded and green-but-meaningless
+when it isn't.
 
 The CSV is a snapshot; refresh it with
 `python -m src.nfl.enrich --force-download` rather than deleting it, and

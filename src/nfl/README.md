@@ -29,6 +29,9 @@ python -m src.nfl.validate
 
 # Backtest + market tests + 2026 projections
 python -m src.nfl.ratings
+
+# Stage 3: are the situational columns mispriced?
+python -m src.nfl.situational
 ```
 
 ## What's in the store
@@ -109,16 +112,70 @@ performance *against* the close, not CLV. That is still the right test for
 whether a model has edge — but proving you can capture edge in practice
 needs timestamped line history from an odds API.
 
+## Stage 3: the situational columns
+
+`python -m src.nfl.situational` asks three questions of `home_rest`,
+`away_rest`, `div_game`, `roof`, `temp` and `wind`. The obvious one —
+bolt them onto Elo — is the least useful, because the closing spread has
+already priced them. So the sharp test comes first: regress the
+**market's own residual** on each feature. If the market is efficient
+every coefficient is zero, and anything that isn't is a mispriced angle.
+
+**A. On margins, nothing.** Regressing (actual margin − spread's implied
+margin) on all nine features over 4,363 games gives R² = 0.0008 and not
+one |t| > 2. Rest, byes, divisional games, domes and cold are priced.
+
+**B. On totals, wind is real.** Same regression on (points − closing
+total), outdoor games only:
+
+| Feature | Coef | SE | t |
+|---|---|---|---|
+| **wind** | **−0.243 pts/mph** | 0.068 | **−3.58** |
+| divisional game | −1.211 | 0.504 | −2.40 |
+| temperature | −0.002 | 0.017 | −0.14 |
+| cold (≤32°F) | +0.718 | 1.099 | +0.65 |
+
+Every extra 5 mph is worth about 1.2 points of total that the closing
+number does not take out. Six under-betting thresholds were tried, best
+around 2σ — which is what noise looks like — so the module picks the
+threshold on **2010–2017 only** and then bets it blind:
+
+| | Wind slope | Frozen rule (wind ≥ 12) |
+|---|---|---|
+| 2010–2017 (fit) | −0.239 pts/mph, t = −2.56 | 53.6% |
+| **2018–2025 (holdout)** | **−0.239 pts/mph, t = −2.43** | **58.8%, +12.3% ROI, Z = 2.34** |
+
+The slope replicates to three decimal places on games it never saw. That
+is the most durable result in this project.
+
+**But the betting rule is much shakier than the slope.** Only 9 of 16
+seasons beat break-even, and 2024 and 2025 both lost (47.4%, 47.2%) —
+the holdout's 58.8% leans on 2021–23. Believe the coefficient; treat the
+threshold rule as noisy.
+
+**The caveat that matters most:** `wind` is the reading *at kickoff*, and
+nobody has it when the bet is placed — the market prices a *forecast*.
+Some unknown share of this edge is "games windier than forecast", which
+is not a bet anyone can place. Separating the two needs a wind forecast
+as of bet time and a timestamped total.
+
+**C. As a forecast, it adds nothing.** Elo + situational, refit
+walk-forward on prior seasons only, is a touch *worse* than plain Elo
+(64.4% vs 64.6%, MAE 10.43 vs 10.40) and still finds no edge against the
+spread. Exactly what A predicts.
+
 ## Next
 
-Nothing above found an edge with box-score Elo, which is the honest
-starting point. Candidate directions, roughly by cost:
+Stage 3 turned up one lead, and it points at the same missing piece the
+CLV limitation does:
 
-1. **Better features** — nflverse play-by-play carries EPA, success rate
+1. **Timestamped odds + weather forecasts** — the only way to find out
+   whether the wind result is tradeable or an artefact of hindsight
+   weather. Now the highest-value direction, because there is a specific
+   hypothesis to test rather than a general hope.
+2. **Better features** — nflverse play-by-play carries EPA, success rate
    and CPOE, all far more predictive per-game than box-score margin.
-2. **Situational angles** — `home_rest`, `away_rest`, `div_game`, `roof`,
-   `temp` and `wind` are already loaded and unused by the model.
-3. **Timestamped odds** — required for real CLV, and for finding stale
-   numbers rather than trying to out-predict the close.
+   Still the best route to a *sides* model, which Stage 3 confirms Elo
+   plus situational context will not produce.
 
 Paper-trade any of it for a full season before risking money.
