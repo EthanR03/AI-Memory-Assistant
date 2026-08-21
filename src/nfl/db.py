@@ -75,6 +75,11 @@ CREATE TABLE IF NOT EXISTS games (
     gametime    TEXT,
     home_qb     TEXT,
     away_qb     TEXT,
+    -- GSIS ids ("00-0036442"), carried so a player feed can be joined on
+    -- an id rather than on a name. Name joins break on suffixes and on
+    -- the several pairs of players who share one.
+    home_qb_id  TEXT,
+    away_qb_id  TEXT,
     home_coach  TEXT,
     away_coach  TEXT,
     referee     TEXT,
@@ -119,6 +124,26 @@ CREATE TABLE IF NOT EXISTS qb_records (
     ties     INTEGER NOT NULL,
     win_pct  REAL NOT NULL
 );
+
+-- What the model said, so the chat layer can SELECT a forecast instead
+-- of re-running a 7,500-game walk-forward per question.
+--
+-- These are the WALK-FORWARD predictions: each row was produced by a
+-- model that had seen only games before it. That is what makes the table
+-- safe to score against later - it is a record of what would have been
+-- forecast at the time, not a fit to the whole history.
+CREATE TABLE IF NOT EXISTS predictions (
+    game_id       TEXT NOT NULL REFERENCES games(game_id),
+    model         TEXT NOT NULL,   -- 'elo', 'elo+situational', ...
+    p_home        REAL,            -- modelled probability the home club wins
+    pred_margin   REAL,            -- modelled home margin, in points
+    market_margin REAL,            -- the closing spread's implied home margin
+    edge          REAL,            -- pred_margin - market_margin, NULL if unpriced
+    built_at      TEXT NOT NULL,
+    PRIMARY KEY (game_id, model)
+);
+
+CREATE INDEX IF NOT EXISTS predictions_model ON predictions (model);
 
 -- Provenance: which pages produced which table, and when.
 CREATE TABLE IF NOT EXISTS ingest_log (
@@ -169,9 +194,10 @@ def game_id(season: int, game_type: str, week: int | None,
     return f"{season}-{game_type}-{wk}-{away}@{home}"
 
 
-# Child tables first: every one of these references teams(team_id).
-_TABLE_ORDER = ["ingest_log", "games", "team_season_stats", "standings",
-                "qb_records", "teams"]
+# Child tables first: every one of these references teams(team_id), and
+# predictions references games(game_id), so it has to go before games.
+_TABLE_ORDER = ["ingest_log", "predictions", "games", "team_season_stats",
+                "standings", "qb_records", "teams"]
 
 
 def reset(conn: sqlite3.Connection) -> None:

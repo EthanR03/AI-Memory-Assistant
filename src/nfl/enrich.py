@@ -31,7 +31,8 @@ GAME_COLUMNS = [
     "over_odds", "under_odds",
     "home_rest", "away_rest", "roof", "surface", "temp", "wind",
     "nflverse_game_id", "div_game", "stadium",
-    "home_qb", "away_qb", "home_coach", "away_coach", "referee",
+    "home_qb", "away_qb", "home_qb_id", "away_qb_id",
+    "home_coach", "away_coach", "referee",
     "note", "source",
 ]
 

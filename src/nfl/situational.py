@@ -482,7 +482,8 @@ def _score_margin(name: str, preds: list[Prediction], margin_of) -> dict:
                           lambda p: normal_cdf(margin_of(p) / MARGIN_SD))
 
 
-def test_c_model(games: list[dict], predictions: list[Prediction]) -> None:
+def test_c_model(games: list[dict],
+                 predictions: list[Prediction]) -> list[Prediction]:
     augmented, fits = walk_forward_augmented(games, predictions)
     aug_by_id = {p.game_id: p for p in augmented}
 
@@ -531,6 +532,7 @@ def test_c_model(games: list[dict], predictions: list[Prediction]) -> None:
         print(f"{_label_of(name, MARGIN_FEATURES):<34}{last.beta[i]:>+9.3f}"
               f"{last.se[i]:>8.3f}{last.t[i]:>8.2f}")
     print("-" * 72)
+    return augmented
 
 
 # --- CLI -----------------------------------------------------------------
@@ -546,7 +548,14 @@ def run() -> None:
 
     test_a_margin_residuals(games)
     test_b_total_residuals(games)
-    test_c_model(games, predictions)
+    augmented = test_c_model(games, predictions)
+
+    # Stored alongside 'elo' rather than replacing it, so the chat layer
+    # can show both forecasts for a game and the table keeps a record of
+    # the model that lost as well as the one that lost by less.
+    saved = ratings.save_predictions(conn, "elo+situational", augmented)
+    print(f"\nSaved {saved:,} forecasts to `predictions` "
+          f"(model 'elo+situational').")
 
     print(f"\nBreak-even at -110 is {BREAK_EVEN:.1%}. "
           "|Z| and |T| under ~2 are noise.")

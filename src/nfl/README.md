@@ -43,9 +43,28 @@ python -m src.nfl.situational
 | `team_season_stats` | 3,904 | the 16-column matrices, pdf 257–260 |
 | `standings` | 32 | pdf 245 |
 | `qb_records` | 67 | pdf 313 |
+| `predictions` | 12,183 | written by `ratings` and `situational` |
 
 7,276 played games; 7,388 with a closing spread; 5,407 with moneylines.
 The 2026 slate has 112 of 272 games already priced with lookahead lines.
+
+`predictions` holds the **walk-forward** forecasts — every row was
+produced by a model that had seen only earlier games, which is what makes
+them safe to score against results later. `ratings` writes the `elo`
+model (1999–2026) and `situational` writes `elo+situational`
+(2010–2026); each replaces only its own rows, so the two coexist. It
+exists so a chat layer can answer "who wins in week 1" with a `SELECT`
+rather than re-running a 7,500-game backtest per question:
+
+```sql
+SELECT g.away_team, g.home_team, p.pred_margin, p.market_margin, p.edge
+  FROM predictions p JOIN games g USING(game_id)
+ WHERE p.model = 'elo' AND g.season = 2026 AND g.week = 1
+ ORDER BY ABS(p.edge) DESC;
+```
+
+`games.home_qb_id` / `away_qb_id` carry nflverse GSIS ids, so a player
+feed (bios, stats) joins on an id rather than on a name.
 
 ## How the data is verified
 

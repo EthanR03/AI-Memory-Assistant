@@ -120,6 +120,8 @@ def load_rows(path: Path) -> list[dict]:
                 "stadium": _clean(r["stadium"]),
                 "home_qb": _clean(r["home_qb_name"]),
                 "away_qb": _clean(r["away_qb_name"]),
+                "home_qb_id": _clean(r["home_qb_id"]),
+                "away_qb_id": _clean(r["away_qb_id"]),
                 "home_coach": _clean(r["home_coach"]),
                 "away_coach": _clean(r["away_coach"]),
                 "referee": _clean(r["referee"]),

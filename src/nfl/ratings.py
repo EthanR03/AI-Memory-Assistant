@@ -14,6 +14,7 @@ and ratings are regressed toward the mean between seasons.
 """
 import math
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from .. import config
 from . import db
@@ -237,6 +238,40 @@ def against_the_spread(predictions: list[Prediction], season_from: int,
     }
 
 
+# --- Persistence ---------------------------------------------------------
+
+def save_predictions(conn, model: str, predictions: list[Prediction]) -> int:
+    """Write one model's walk-forward forecasts to the predictions table.
+
+    Rows for `model` are cleared first, so re-running replaces a model's
+    forecasts rather than leaving a mix of two vintages behind. Other
+    models are untouched, which is what lets 'elo' and 'elo+situational'
+    live in the table side by side.
+
+    This exists so the assistant can answer "who wins in week 1, and by
+    how much" with a SELECT. Recomputing a 7,500-game walk-forward for
+    every question would work and would be absurd.
+    """
+    built_at = datetime.now(timezone.utc).isoformat()
+    rows = [{
+        "game_id": p.game_id,
+        "model": model,
+        "p_home": p.p_home,
+        "pred_margin": p.pred_margin,
+        "market_margin": p.market_margin,
+        "edge": (None if p.market_margin is None
+                 else p.pred_margin - p.market_margin),
+        "built_at": built_at,
+    } for p in predictions]
+
+    with conn:
+        conn.execute("DELETE FROM predictions WHERE model = ?", (model,))
+        return db.replace_all(conn, "predictions", rows, [
+            "game_id", "model", "p_home", "pred_margin",
+            "market_margin", "edge", "built_at",
+        ])
+
+
 # --- CLI -----------------------------------------------------------------
 
 HOLDOUT_FROM = 2010   # ratings have long since warmed up by here
@@ -258,7 +293,11 @@ def run() -> None:
     model = Elo()
     predictions = walk_forward(games, model)
 
+    saved = save_predictions(conn, "elo", predictions)
+
     played = sum(1 for p in predictions if p.actual_margin is not None)
+    print(f"Saved {saved:,} walk-forward forecasts to `predictions` "
+          f"(model 'elo').\n")
     print(f"Walk-forward backtest over {played:,} played games, 1999-2025")
     print(f"Scored on {HOLDOUT_FROM}-2025, where a closing spread exists.\n")
     _print_table(compare(predictions, HOLDOUT_FROM))
