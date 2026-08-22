@@ -7,9 +7,11 @@ Two data sources feeding one SQLite feature store:
 - **Stage 2** — [nflverse](https://github.com/nflverse/nfldata)
   `games.csv`: ~7,500 games back to 1999 with closing spreads, totals,
   moneylines, rest days and weather.
-- **Bios** — the nflverse `players` release: 25,050 players back to 1974.
-  Not committed (~7 MB) and not needed to build or backtest; fetch it
-  when you want the assistant to answer "who is X".
+- **Players** — the nflverse `players` and `stats_player` releases:
+  25,050 bios back to 1974 and 61,533 player-seasons back to 1999.
+  Neither is committed (~32 MB together) and neither is needed to build
+  or backtest; fetch them when you want the assistant to answer "who is
+  X" and "who led the league in receiving".
 
 ## Build it
 
@@ -36,14 +38,16 @@ python -m src.nfl.ratings
 # Stage 3: are the situational columns mispriced?
 python -m src.nfl.situational
 
-# Optional: player bios (one 7 MB download, needed only for chat)
-python -m src.nfl.players
+# Optional: player bios and season stats, needed only for chat
+python -m src.nfl.players       # one 7 MB file
+python -m src.nfl.playerstats   # 54 files, ~25 MB, 1999-2025
 ```
 
-Run `players` last. `build` clears the whole store before reloading it,
-so re-running Stage 1 drops the bios (and the predictions) and you re-run
-the later steps to put them back — the CSV stays cached, so that costs
-nothing but the seconds.
+Run the two player steps last, and `players` before `playerstats` so the
+stat rows have names to join to. `build` clears the whole store before
+reloading it, so re-running Stage 1 drops both (and the predictions) and
+you re-run the later steps to put them back — the CSVs stay cached, so
+that costs nothing but the seconds.
 
 ## What's in the store
 
@@ -55,6 +59,7 @@ nothing but the seconds.
 | `standings` | 32 | pdf 245 |
 | `qb_records` | 67 | pdf 313 |
 | `players` | 25,050 (1974–2026) | nflverse `players`, via `src.nfl.players` |
+| `player_stats` | 61,533 (1999–2025) | nflverse `stats_player`, via `src.nfl.playerstats` |
 | `predictions` | 12,183 | written by `ratings` and `situational` |
 
 7,276 played games; 7,388 with a closing spread; 5,407 with moneylines.
@@ -75,13 +80,12 @@ SELECT g.away_team, g.home_team, p.pred_margin, p.market_margin, p.edge
  ORDER BY ABS(p.edge) DESC;
 ```
 
-`players` is **bios only** — born, drafted, college, position, size,
-first and last season. No passing, rushing or receiving numbers live
-anywhere in the store; those are in nflverse's separate `stats_player`
-release. It joins `games` on the GSIS id rather than the name, which is
-what `home_qb_id` / `away_qb_id` are there for — all 348 distinct
-starting-QB ids resolve, and `src.nfl.players` re-checks that on every
-run:
+`players` holds identity — born, drafted, college, position, size, first
+and last season — and `player_stats` holds production, one row per player
+per season per `season_type`. Both key on the GSIS id rather than the
+name, which is what `home_qb_id` / `away_qb_id` are there for; all 348
+distinct starting-QB ids resolve, and each loader re-checks its join on
+every run:
 
 ```sql
 SELECT p.display_name, p.college_name, p.draft_year, p.draft_pick
@@ -89,10 +93,26 @@ SELECT p.display_name, p.college_name, p.draft_year, p.draft_pick
  WHERE g.season = 2025 AND g.week = 1;
 ```
 
-Two columns in it lie if read literally. **`status` is stale** — Tom
-Brady, Peyton Manning and Joe Montana all read `ACT` — so retired-vs-
-active is `last_season`, not `status`; `latest_team` is likewise the
-last team, not a current one. And `height` is in **inches**.
+Two columns in `players` lie if read literally. **`status` is stale** —
+Tom Brady, Peyton Manning and Joe Montana all read `ACT` — so retired-vs-
+active is `last_season`, not `status`; `latest_team` is likewise the last
+team, not a current one. And `height` is in **inches**.
+
+`player_stats` has three of its own worth knowing:
+
+- **`REG` and `POST` partition the season**, so a bare `SUM` mixes them.
+  Career totals default to `REG`, which is what the NFL means by one —
+  Burrow is 20,810 career passing yards, not 22,636.
+- **The numbers are nflverse's, computed from play-by-play, not the
+  official box score.** They agree almost always; the exception found so
+  far is Drew Brees in 2011, which reads 5,535 passing yards against an
+  official 5,476. That is enough to put this table's all-time
+  single-season passing leaderboard in the wrong order, so the assistant
+  is told to attribute figures to nflverse and never call one a record.
+- **It is not walk-forward.** A season total for year N contains the game
+  a Stage-N model would be predicting, so it must never be joined into a
+  backtest. Season grain is for answering questions; the weekly files
+  exist if the predictor ever wants player inputs.
 
 ## How the data is verified
 

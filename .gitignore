@@ -20,5 +20,9 @@ nfl.db
 #   python -m src.nfl.players
 data/nflverse/players.csv
 
+# Season player statistics: 54 files, ~25 MB, same reasoning. Fetch with
+#   python -m src.nfl.playerstats
+data/nflverse/stats/
+
 # The source PDF is ~22 MB; keep it out of git history.
 data/*.pdf

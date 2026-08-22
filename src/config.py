@@ -46,6 +46,10 @@ NFLVERSE_GAMES = NFLVERSE_DIR / "games.csv"
 # `python -m src.nfl.players` fetches it on demand.
 NFLVERSE_PLAYERS = NFLVERSE_DIR / "players.csv"
 
+# Season-level player statistics, one file per season per season_type
+# (~25 MB all told). Also not committed; see src/nfl/playerstats.py.
+NFLVERSE_STATS = NFLVERSE_DIR / "stats"
+
 # The book's data is frozen at this date; anything later (cuts, trades,
 # injuries) is NOT in it. Worth surfacing in any answer built on it.
 FACTBOOK_AS_OF = "2026-07-14"

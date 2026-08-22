@@ -152,6 +152,57 @@ CREATE TABLE IF NOT EXISTS players (
 CREATE INDEX IF NOT EXISTS players_name ON players (display_name);
 CREATE INDEX IF NOT EXISTS players_position ON players (position);
 
+-- Season-level production, from nflverse `stats_player`. One row per
+-- player per season per season_type, joined to `players` on gsis_id.
+--
+-- NOT WALK-FORWARD, and not safe to join into a backtest: a season total
+-- for year N includes the game a Stage-N model would be predicting. This
+-- table exists to answer questions, not to fit models. See playerstats.py.
+--
+-- 'REG' and 'POST' partition the season. nflverse also publishes the two
+-- summed together; that file is deliberately NOT loaded, so SUM() over
+-- this table cannot double-count.
+CREATE TABLE IF NOT EXISTS player_stats (
+    player_id     TEXT NOT NULL,   -- gsis_id; join to players.gsis_id
+    season        INTEGER NOT NULL,
+    season_type   TEXT NOT NULL,   -- 'REG' | 'POST'
+    recent_team   TEXT,            -- last club that season, not every club
+    position      TEXT,
+    games         INTEGER,
+
+    completions   INTEGER, attempts INTEGER,
+    passing_yards INTEGER, passing_tds INTEGER,
+    passing_interceptions INTEGER, sacks_suffered INTEGER,
+    passing_first_downs INTEGER, passing_air_yards REAL,
+    passing_epa   REAL, passing_cpoe REAL,
+
+    carries       INTEGER, rushing_yards INTEGER, rushing_tds INTEGER,
+    rushing_first_downs INTEGER, rushing_fumbles_lost INTEGER,
+    rushing_epa   REAL,
+
+    receptions    INTEGER, targets INTEGER, receiving_yards INTEGER,
+    receiving_tds INTEGER, receiving_first_downs INTEGER,
+    receiving_air_yards REAL, receiving_epa REAL, target_share REAL,
+
+    def_tackles_solo INTEGER, def_tackle_assists INTEGER,
+    def_tackles_for_loss REAL, def_sacks REAL, def_qb_hits REAL,
+    def_interceptions INTEGER, def_pass_defended INTEGER,
+    def_fumbles_forced REAL, def_tds INTEGER,
+
+    fg_made INTEGER, fg_att INTEGER, fg_pct REAL, fg_long INTEGER,
+    pat_made INTEGER, pat_att INTEGER,
+
+    punt_return_yards INTEGER, kickoff_return_yards INTEGER,
+    special_teams_tds INTEGER, fumbles_lost_total INTEGER,
+
+    fantasy_points REAL, fantasy_points_ppr REAL,
+
+    PRIMARY KEY (player_id, season, season_type)
+);
+
+CREATE INDEX IF NOT EXISTS player_stats_season ON player_stats (season);
+CREATE INDEX IF NOT EXISTS player_stats_player ON player_stats (player_id);
+
 CREATE TABLE IF NOT EXISTS qb_records (
     player   TEXT PRIMARY KEY,
     wins     INTEGER NOT NULL,
@@ -232,7 +283,7 @@ def game_id(season: int, game_type: str, week: int | None,
 # Child tables first: every one of these references teams(team_id), and
 # predictions references games(game_id), so it has to go before games.
 _TABLE_ORDER = ["ingest_log", "predictions", "games", "team_season_stats",
-                "standings", "qb_records", "players", "teams"]
+                "standings", "qb_records", "player_stats", "players", "teams"]
 
 
 def reset(conn: sqlite3.Connection) -> None:

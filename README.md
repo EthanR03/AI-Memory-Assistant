@@ -55,7 +55,8 @@ tools and lets it choose:
   wrote and decided.
 - **`query_nfl_db`** — read-only SQL over the predictor's store, for
   anything factual about football: games, lines, weather, model
-  forecasts, and bios for every player since 1974.
+  forecasts, bios for every player since 1974 and season statistics
+  from 1999 on.
 
 That split is the lesson the Fact Book taught, applied deliberately:
 prose gets retrieved, records get queried. "Which club has the best
@@ -70,7 +71,11 @@ The Kansas City Chiefs ... with 135 wins and 53 losses from 2016 to 2025.
 
 $ python -m src.ask "Who is Joe Burrow?"
 Joe Burrow ... born 10 Dec 1996, 6'4", LSU, first overall in 2020 ...
-43-33-1 in the regular season, 48-35 including the postseason.
+20,810 career passing yards, 43-33-1 as a regular-season starter.
+(retrieved from: nfl.db)
+
+$ python -m src.ask "Who led the NFL in receiving yards in 2023?"
+Tyreek Hill led the NFL in receiving yards in 2023 with 1,799 yards.
 (retrieved from: nfl.db)
 
 $ python -m src.ask "What is the goal of the project?"
@@ -118,7 +123,8 @@ python -m src.nfl.enrich     # add nflverse, cross-validate the overlap
 python -m src.nfl.validate   # 18 consistency checks
 python -m src.nfl.ratings    # backtest + market tests + 2026 projections
 python -m src.nfl.situational  # are the situational columns mispriced?
-python -m src.nfl.players    # optional: player bios, for chat
+python -m src.nfl.players    # optional: bios, for chat
+python -m src.nfl.playerstats  # optional: season stats, for chat
 ```
 
 That yields 7,548 games (1999–2026) with closing lines, 32 team blocks,
@@ -169,9 +175,10 @@ because `standings` is empty and an empty comparison finds no mismatch.
 They are real checks when the book is loaded and green-but-meaningless
 when it isn't.
 
-`data/nflverse/players.csv` (~7 MB) is *not* committed. Nothing in the
-build or the backtest reads it — it only fills bios for the chat layer —
-so `python -m src.nfl.players` fetches it on demand instead.
+The player feeds — `data/nflverse/players.csv` (~7 MB) and
+`data/nflverse/stats/` (54 files, ~25 MB) — are *not* committed. Nothing
+in the build or the backtest reads them; they only serve the chat layer,
+so `src.nfl.players` and `src.nfl.playerstats` fetch them on demand.
 
 The CSV is a snapshot; refresh it with
 `python -m src.nfl.enrich --force-download` rather than deleting it, and

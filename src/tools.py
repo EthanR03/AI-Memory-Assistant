@@ -147,7 +147,22 @@ standings (2025 ONLY - 32 rows)
   division_champ, wild_card
 qb_records (67 rows, CAREER totals, no season dimension)
   player, wins, losses, ties, win_pct
-players (25,050 rows - BIOS ONLY, every player since 1974)
+player_stats (61,533 rows - season totals, 1999-2025)
+  player_id (= players.gsis_id), season, season_type ('REG'|'POST'),
+  recent_team, position, games,
+  completions, attempts, passing_yards, passing_tds,
+  passing_interceptions, sacks_suffered, passing_first_downs,
+  passing_air_yards, passing_epa, passing_cpoe,
+  carries, rushing_yards, rushing_tds, rushing_first_downs,
+  rushing_fumbles_lost, rushing_epa,
+  receptions, targets, receiving_yards, receiving_tds,
+  receiving_first_downs, receiving_air_yards, receiving_epa, target_share,
+  def_tackles_solo, def_tackle_assists, def_tackles_for_loss, def_sacks,
+  def_qb_hits, def_interceptions, def_pass_defended, def_fumbles_forced,
+  def_tds, fg_made, fg_att, fg_pct, fg_long, pat_made, pat_att,
+  punt_return_yards, kickoff_return_yards, special_teams_tds,
+  fumbles_lost_total, fantasy_points, fantasy_points_ppr
+players (25,050 rows - BIOS, every player since 1974)
   gsis_id, display_name, first_name, last_name, suffix, birth_date,
   position, position_group, height, weight, college_name,
   college_conference, jersey_number, rookie_season, last_season,
@@ -167,12 +182,43 @@ Things that will produce wrong answers if ignored:
   Filter on played = 1 for anything historical.
 - temp and wind are only recorded for outdoor games, and are the reading
   AT KICKOFF. roof is 'outdoors', 'dome', 'closed' or 'open'.
-- No game data before 1999 exists. `players` reaches back to 1974 but is
-  BIOS ONLY: there are still NO passing/rushing/receiving stats, no
-  rosters and no injuries anywhere in the store. qb_records is win-loss
-  only. For a player question, combine the bio from `players` with the
-  win-loss record derived from `games`, and say plainly that per-game
-  statistics are not held.
+- No game data before 1999 exists, and player_stats starts at 1999 too,
+  so a career total for anyone who played earlier is PARTIAL - say so
+  rather than reporting it as the career figure. Still absent from the
+  store entirely: per-GAME (as opposed to per-season) statistics,
+  rosters, injuries and depth charts.
+- player_stats is SEASON TOTALS. It cannot answer "how did he do in week
+  9" or "in the Chiefs game" - only "in 2023". Do not fake it by joining
+  to a single game.
+- player_stats carries NO NAME. Join it: `JOIN players p ON
+  p.gsis_id = s.player_id`. Four ids in player_stats have no bio row and
+  come back NULL, so use an INNER join for leaderboards.
+- season_type 'REG' and 'POST' PARTITION the season, so a bare SUM over
+  player_stats silently mixes them. DEFAULT TO 'REG' for any career or
+  season total, because that is what the NFL means by a career statistic
+  and what qb_records already counts - Joe Burrow's career passing yards
+  are 20,810 (REG), not 22,636 (REG+POST). State the basis, and give the
+  postseason as a separate figure when it is interesting. Only combine
+  the two if the question actually asks for everything.
+- player_stats figures are DERIVED FROM PLAY-BY-PLAY and are not the
+  official NFL box score. They agree with it nearly always, but not
+  always: Drew Brees 2011 reads 5,535 passing yards here when the
+  official record is 5,476, which makes this table's all-time
+  single-season passing leaderboard WRONG AT THE TOP - it returns Brees
+  2011 ahead of Peyton Manning's 5,477 in 2013, which is the real record.
+  Attribute these numbers to nflverse, never call one an NFL record, and
+  if asked for a record specifically, say the store cannot certify it.
+- player_stats.recent_team is the LAST club of that season, so a traded
+  player's whole season sits under one team. It is not a per-club split.
+- Unused categories are 0, not NULL - a quarterback has
+  receiving_yards = 0. Filter on position or on attempts/targets/carries
+  being non-zero before ranking, or punters appear in rushing tables.
+- player_stats is NOT walk-forward: a season total for year N includes
+  the game itself. Never join it to `predictions` or use it to justify a
+  forecast; that is a leak. Use it for questions about the past only.
+- 6,081 rows in `players` carry a non-GSIS id (an ESB id) because the
+  feed had no GSIS id for them. Those players can never join to games or
+  player_stats - a bio with no stats is usually this, not a data error.
 - players.status IS STALE and must never be used to say who is playing
   now: Tom Brady, Peyton Manning and Joe Montana all read 'ACT'. Use
   last_season instead - last_season < the current season means the player
@@ -230,7 +276,8 @@ TOOL_SPEC = {
     "description": (
         "Run a read-only SQL SELECT against the NFL store to answer "
         "questions about games, teams, results, betting lines, "
-        "conditions and player bios from 1999 to 2026. Prefer computing "
+        "conditions, player bios and season statistics from 1999 to "
+        "2026. Prefer computing "
         "an answer with "
         "SQL over recalling it. " + SCHEMA_NOTES),
     "input_schema": {
