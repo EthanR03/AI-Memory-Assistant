@@ -15,5 +15,10 @@ nfl.db
 # the store offline. nflverse.py only re-downloads it on --force-download,
 # so refresh it that way rather than deleting it.
 
+# players.csv is ~7 MB and, unlike games.csv, nothing in the build or the
+# backtest needs it - it only fills bios. Fetch it with
+#   python -m src.nfl.players
+data/nflverse/players.csv
+
 # The source PDF is ~22 MB; keep it out of git history.
 data/*.pdf

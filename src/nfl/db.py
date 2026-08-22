@@ -117,6 +117,41 @@ CREATE TABLE IF NOT EXISTS standings (
     PRIMARY KEY (season, team_id)
 );
 
+-- Player bios, from the nflverse `players` release. The join key is
+-- gsis_id, which is exactly what games.home_qb_id / away_qb_id carry -
+-- all 348 distinct QB ids in `games` resolve here.
+--
+-- Bios only: no passing, rushing or receiving numbers live in this feed.
+CREATE TABLE IF NOT EXISTS players (
+    gsis_id       TEXT PRIMARY KEY,
+    display_name  TEXT NOT NULL,
+    first_name    TEXT,
+    last_name     TEXT,
+    suffix        TEXT,
+    birth_date    TEXT,          -- ISO; age must be computed, not read
+    position      TEXT,
+    position_group TEXT,
+    height        INTEGER,       -- INCHES (76 = 6ft 4in)
+    weight        INTEGER,       -- pounds
+    college_name  TEXT,          -- may list two schools: 'LSU; Ohio State'
+    college_conference TEXT,
+    jersey_number INTEGER,
+    rookie_season INTEGER,
+    last_season   INTEGER,       -- the retired/active test; `status` is not
+    latest_team   TEXT,          -- mapped to a current franchise id
+    status        TEXT,          -- STALE for retired players; see players.py
+    years_of_experience INTEGER,
+    draft_year    INTEGER,       -- NULL means undrafted
+    draft_round   INTEGER,
+    draft_pick    INTEGER,       -- overall, not within the round
+    draft_team    TEXT,
+    pfr_id        TEXT,          -- Pro-Football-Reference key, for linking
+    headshot      TEXT
+);
+
+CREATE INDEX IF NOT EXISTS players_name ON players (display_name);
+CREATE INDEX IF NOT EXISTS players_position ON players (position);
+
 CREATE TABLE IF NOT EXISTS qb_records (
     player   TEXT PRIMARY KEY,
     wins     INTEGER NOT NULL,
@@ -197,7 +232,7 @@ def game_id(season: int, game_type: str, week: int | None,
 # Child tables first: every one of these references teams(team_id), and
 # predictions references games(game_id), so it has to go before games.
 _TABLE_ORDER = ["ingest_log", "predictions", "games", "team_season_stats",
-                "standings", "qb_records", "teams"]
+                "standings", "qb_records", "players", "teams"]
 
 
 def reset(conn: sqlite3.Connection) -> None:

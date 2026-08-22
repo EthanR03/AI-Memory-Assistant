@@ -34,14 +34,18 @@ GAME_TYPES = {
 }
 
 
-def download(dest: Path, force: bool = False) -> Path:
-    """Fetch games.csv unless it is already on disk."""
+def download(dest: Path, force: bool = False, url: str = GAMES_URL) -> Path:
+    """Fetch an nflverse file unless it is already on disk.
+
+    `url` defaults to games.csv; players.py passes its own release URL so
+    both feeds share one cache-and-fetch path.
+    """
     if dest.exists() and not force:
         return dest
     import requests
 
     dest.parent.mkdir(parents=True, exist_ok=True)
-    response = requests.get(GAMES_URL, timeout=60)
+    response = requests.get(url, timeout=60)
     response.raise_for_status()
     dest.write_bytes(response.content)
     return dest

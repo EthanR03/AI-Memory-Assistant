@@ -147,6 +147,12 @@ standings (2025 ONLY - 32 rows)
   division_champ, wild_card
 qb_records (67 rows, CAREER totals, no season dimension)
   player, wins, losses, ties, win_pct
+players (25,050 rows - BIOS ONLY, every player since 1974)
+  gsis_id, display_name, first_name, last_name, suffix, birth_date,
+  position, position_group, height, weight, college_name,
+  college_conference, jersey_number, rookie_season, last_season,
+  latest_team, status, years_of_experience, draft_year, draft_round,
+  draft_pick, draft_team, pfr_id, headshot
 
 Things that will produce wrong answers if ignored:
 
@@ -161,9 +167,25 @@ Things that will produce wrong answers if ignored:
   Filter on played = 1 for anything historical.
 - temp and wind are only recorded for outdoor games, and are the reading
   AT KICKOFF. roof is 'outdoors', 'dome', 'closed' or 'open'.
-- Nothing before 1999 exists, and there is NO player-level data - no
-  passing/rushing/receiving stats, no rosters, no injuries, no bios.
-  qb_records is win-loss only.
+- No game data before 1999 exists. `players` reaches back to 1974 but is
+  BIOS ONLY: there are still NO passing/rushing/receiving stats, no
+  rosters and no injuries anywhere in the store. qb_records is win-loss
+  only. For a player question, combine the bio from `players` with the
+  win-loss record derived from `games`, and say plainly that per-game
+  statistics are not held.
+- players.status IS STALE and must never be used to say who is playing
+  now: Tom Brady, Peyton Manning and Joe Montana all read 'ACT'. Use
+  last_season instead - last_season < the current season means the player
+  is no longer active. latest_team has the same problem (it is the last
+  team, not a current one).
+- players.height is in INCHES (76 -> 6'4"), weight in pounds. birth_date
+  is ISO, so age must be COMPUTED from today's date, not read off.
+- players.draft_year NULL means UNDRAFTED - say so rather than reporting
+  it as missing data. draft_pick is the OVERALL pick, not the pick within
+  its round. college_name can list two schools ('LSU; Ohio State').
+- Join players to games on the GSIS id, never the name:
+  `JOIN players p ON p.gsis_id = g.home_qb_id`. All 348 starting QB ids
+  in `games` resolve. Names collide and vary by suffix.
 - qb_records counts REGULAR SEASON games only, while home_qb/away_qb in
   games covers both. Joe Burrow is 43-33-1 in qb_records and 48-35 across
   all games, and both are right - the difference is a 5-2 postseason
@@ -186,8 +208,8 @@ Things that will produce wrong answers if ignored:
   edge filter clears the 52.4% break-even by more than noise. Report a
   forecast as the model's opinion, and say plainly that it has no
   demonstrated edge. Never present a pick as profitable advice.
-- home_qb_id/away_qb_id are GSIS ids, the join key to any nflverse player
-  feed. Join on the id, not the name.
+- home_qb_id/away_qb_id are GSIS ids, the join key into `players`. Join on
+  the id, not the name.
 
 Per-team records are written like this:
 
@@ -207,8 +229,9 @@ TOOL_SPEC = {
     "name": "query_nfl_db",
     "description": (
         "Run a read-only SQL SELECT against the NFL store to answer "
-        "questions about games, teams, results, betting lines and "
-        "conditions from 1999 to 2026. Prefer computing an answer with "
+        "questions about games, teams, results, betting lines, "
+        "conditions and player bios from 1999 to 2026. Prefer computing "
+        "an answer with "
         "SQL over recalling it. " + SCHEMA_NOTES),
     "input_schema": {
         "type": "object",

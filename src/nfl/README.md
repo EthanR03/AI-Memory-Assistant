@@ -7,6 +7,9 @@ Two data sources feeding one SQLite feature store:
 - **Stage 2** — [nflverse](https://github.com/nflverse/nfldata)
   `games.csv`: ~7,500 games back to 1999 with closing spreads, totals,
   moneylines, rest days and weather.
+- **Bios** — the nflverse `players` release: 25,050 players back to 1974.
+  Not committed (~7 MB) and not needed to build or backtest; fetch it
+  when you want the assistant to answer "who is X".
 
 ## Build it
 
@@ -32,7 +35,15 @@ python -m src.nfl.ratings
 
 # Stage 3: are the situational columns mispriced?
 python -m src.nfl.situational
+
+# Optional: player bios (one 7 MB download, needed only for chat)
+python -m src.nfl.players
 ```
+
+Run `players` last. `build` clears the whole store before reloading it,
+so re-running Stage 1 drops the bios (and the predictions) and you re-run
+the later steps to put them back — the CSV stays cached, so that costs
+nothing but the seconds.
 
 ## What's in the store
 
@@ -43,6 +54,7 @@ python -m src.nfl.situational
 | `team_season_stats` | 3,904 | the 16-column matrices, pdf 257–260 |
 | `standings` | 32 | pdf 245 |
 | `qb_records` | 67 | pdf 313 |
+| `players` | 25,050 (1974–2026) | nflverse `players`, via `src.nfl.players` |
 | `predictions` | 12,183 | written by `ratings` and `situational` |
 
 7,276 played games; 7,388 with a closing spread; 5,407 with moneylines.
@@ -63,8 +75,24 @@ SELECT g.away_team, g.home_team, p.pred_margin, p.market_margin, p.edge
  ORDER BY ABS(p.edge) DESC;
 ```
 
-`games.home_qb_id` / `away_qb_id` carry nflverse GSIS ids, so a player
-feed (bios, stats) joins on an id rather than on a name.
+`players` is **bios only** — born, drafted, college, position, size,
+first and last season. No passing, rushing or receiving numbers live
+anywhere in the store; those are in nflverse's separate `stats_player`
+release. It joins `games` on the GSIS id rather than the name, which is
+what `home_qb_id` / `away_qb_id` are there for — all 348 distinct
+starting-QB ids resolve, and `src.nfl.players` re-checks that on every
+run:
+
+```sql
+SELECT p.display_name, p.college_name, p.draft_year, p.draft_pick
+  FROM games g JOIN players p ON p.gsis_id = g.home_qb_id
+ WHERE g.season = 2025 AND g.week = 1;
+```
+
+Two columns in it lie if read literally. **`status` is stale** — Tom
+Brady, Peyton Manning and Joe Montana all read `ACT` — so retired-vs-
+active is `last_season`, not `status`; `latest_team` is likewise the
+last team, not a current one. And `height` is in **inches**.
 
 ## How the data is verified
 
