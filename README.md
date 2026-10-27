@@ -138,9 +138,14 @@ games, roof and weather. On margins it does not — nine features against
 the spread's own residual give R² = 0.0008 and no |t| > 2. On **totals**
 there is one live result: every mph of wind is worth **−0.24 points** the
 closing number does not take out, and the slope replicates almost exactly
-on a held-out half (−0.239 fitted on 2010–17, −0.239 on 2018–25). It is a
-lead rather than a strategy — `wind` is the reading at kickoff, and the
-market prices a forecast.
+on a held-out half (−0.239 fitted on 2010–17, −0.239 on 2018–25).
+
+Stage 3b checks whether that is hindsight. `wind` is the reading at
+kickoff, while the market prices a forecast. Rerun on archived 24-hour
+forecasts (Open-Meteo, JMA model, 2018–25), the slope is unchanged
+(−0.241 pts/mph, t −3.35), and the part of the kickoff wind that the
+forecast could not see explains none of it. The edge was knowable a day
+out, so it is a paper-trading candidate, not just a lead.
 
 `scripts/` holds the one-off exploration that shaped the schema —
 `analyze_factbook.py`, `map_team_blocks.py`, `explore_nflverse.py`,

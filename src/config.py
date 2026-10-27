@@ -50,6 +50,10 @@ NFLVERSE_PLAYERS = NFLVERSE_DIR / "players.csv"
 # (~25 MB all told). Also not committed; see src/nfl/playerstats.py.
 NFLVERSE_STATS = NFLVERSE_DIR / "stats"
 
+# Archived Open-Meteo forecasts for the Stage 3b wind test, one JSON per
+# season (src/nfl/forecast_wind.py). Not committed; refetched on demand.
+OPENMETEO_DIR = DATA_DIR / "openmeteo"
+
 # The book's data is frozen at this date; anything later (cuts, trades,
 # injuries) is NOT in it. Worth surfacing in any answer built on it.
 FACTBOOK_AS_OF = "2026-07-14"

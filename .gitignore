@@ -24,5 +24,10 @@ data/nflverse/players.csv
 #   python -m src.nfl.playerstats
 data/nflverse/stats/
 
+# Archived Open-Meteo forecasts for the wind test, a few hundred API calls'
+# worth. Fetch with
+#   python -m src.nfl.forecast_wind
+data/openmeteo/
+
 # The source PDF is ~22 MB; keep it out of git history.
 data/*.pdf

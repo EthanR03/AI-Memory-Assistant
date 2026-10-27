@@ -38,6 +38,10 @@ python -m src.nfl.ratings
 # Stage 3: are the situational columns mispriced?
 python -m src.nfl.situational
 
+# Stage 3b: the wind test on archived forecasts (~400 Open-Meteo calls,
+# cached in data/openmeteo/; --offline to rerun from the cache)
+python -m src.nfl.forecast_wind
+
 # Optional: player bios and season stats, needed only for chat
 python -m src.nfl.players       # one 7 MB file
 python -m src.nfl.playerstats   # 54 files, ~25 MB, 1999-2025
@@ -231,15 +235,72 @@ walk-forward on prior seasons only, is a touch *worse* than plain Elo
 (64.4% vs 64.6%, MAE 10.43 vs 10.40) and still finds no edge against the
 spread. Exactly what A predicts.
 
+## Stage 3b: wind you could have known
+
+`forecast_wind.py` reruns test B on **archived forecasts** instead of the
+kickoff reading, from Open-Meteo's Previous Runs API (free,
+non-commercial), which keeps what each model said N days before a given
+hour. Each game gets the mean wind over its kickoff hour and the three
+after it, from three sources:
+
+| Source | Lead time | Archive |
+|---|---|---|
+| default model, short-lead (= the Historical Forecast API series) | 0–6 h | 2018– |
+| default model, `previous_day1` | 24 h | 2024-01-19– |
+| JMA GSM, `previous_day1` (~0.5° grid) | 24 h | 2018– |
+
+JMA's day-ahead archive is the useful one. It covers all 1,563 outdoor
+games from 2018 to 2025, including the 2022 games where nflverse has no
+reading (91 of 198).
+
+Grid wind is on a different scale from a stadium reading, so the
+deciding test rescales each forecast onto kickoff mph. It then splits
+the reading into the part the forecast **knew** and the **surprise** left
+over, and regresses (points − closing total) on both, with temperature:
+
+| Forecast | n | Knowable | t | Surprise | t |
+|---|---|---|---|---|---|
+| short-lead | 1,396 | −0.368 | −3.88 | −0.038 | −0.36 |
+| 24 h, default model | 376 | −0.264 | −1.28 | +0.096 | +0.40 |
+| **24 h, JMA** | **1,396** | **−0.404** | **−3.35** | −0.125 | −1.43 |
+
+**The edge sits in the knowable part.** The surprise slope is near zero
+for every source. That rules out the hindsight story Stage 3 worried
+about: these games do not go under because they turned out windier than
+forecast. They go under on wind the forecast already showed a day out,
+and the closing total, struck about 20 hours later, still did not price
+it.
+
+On its own scale, the JMA day-ahead slope is −0.241 pts/mph (t −3.35).
+It holds up against the obvious explanations:
+- **Robust errors:** HC1 t = −3.59.
+- **Stadium fixed effects:** −0.279, so this is not "Soldier Field goes under".
+- **Dropping any one venue:** −0.222 to −0.264.
+- **By season:** negative in all eight seasons.
+
+Under ≥ 12 forecast mph at −110 goes 136-92-1 (59.6%), and **7 of 8
+seasons** beat break-even, including 2024 and 2025, which both lost on
+the kickoff-reading rule.
+
+What is still open:
+
+- **The bet table is in-sample.** The 12 mph threshold was carried over
+  from Stage 3 rather than re-chosen, but those were kickoff mph, a
+  different scale. The slope is the result; the rule is a sketch.
+- **The default model's day-ahead forecast covers only two seasons.** Its
+  sign agrees, but at t −1.2 it confirms nothing by itself.
+- **The price is a consensus close at an assumed −110.** Betting at the
+  close is possible, but the real number and vig at a given book are
+  not in this data.
+
 ## Next
 
-Stage 3 turned up one lead, and it points at the same missing piece the
-CLV limitation does:
-
-1. **Timestamped odds + weather forecasts** — the only way to find out
-   whether the wind result is tradeable or an artefact of hindsight
-   weather. Now the highest-value direction, because there is a specific
-   hypothesis to test rather than a general hope.
+1. **Paper-trade the wind rule through 2026.** Pull the JMA and default
+   model day-ahead forecast each Saturday and log the under bets before
+   kickoff. The closing total still has to come from somewhere: nflverse
+   after the fact, or the free tier of The Odds API (live odds only).
+   Paid odds history is now worth it only to measure CLV, not to decide
+   whether the lead is real.
 2. **Better features** — nflverse play-by-play carries EPA, success rate
    and CPOE, all far more predictive per-game than box-score margin.
    Still the best route to a *sides* model, which Stage 3 confirms Elo
