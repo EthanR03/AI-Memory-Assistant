@@ -36,6 +36,7 @@ RULE = "v1"
 SEASON = 2026
 THRESHOLD_MPH = 12.0
 PULL_HOURS = (18, 36)    # pull between 36h and 18h before kickoff
+TASK_MAX_LEAD = 26       # how far out scripts/run_live_picks.py pulls
 CLOSE_ODDS = -110        # the close is graded at an assumed -110
 LOOKAHEAD = timedelta(days=7)    # how far ahead "coming up" lists games
 
@@ -248,11 +249,15 @@ def picks(at: datetime | None = None, dry_run: bool = False,
         for g in missed:
             print(f"  {g['nflverse_game_id']:<18}{g['game_date']} {g['gametime']}")
     if later:
-        print("\nComing up - run `picks` once inside each window (local time):")
+        print("\nComing up, in local time. The scheduled task pulls each game "
+              "at its first\nhourly run after TASK PULLS "
+              f"({TASK_MAX_LEAD}h before kickoff). DEADLINE is {lo}h before;\n"
+              "a game not pulled by then is no bet.")
+        print(f"\n  {'GAME':<18}{'TASK PULLS':<18}DEADLINE")
         for g in later:
             ko = kickoff(g)
             print(f"  {g['nflverse_game_id']:<18}"
-                  f"{_local(ko - timedelta(hours=hi))}  to  "
+                  f"{_local(ko - timedelta(hours=TASK_MAX_LEAD)):<18}"
                   f"{_local(ko - timedelta(hours=lo))}")
     return [g["nflverse_game_id"] for g in missed]
 

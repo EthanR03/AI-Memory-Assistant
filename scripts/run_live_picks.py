@@ -33,7 +33,7 @@ sys.path.insert(0, str(ROOT))
 from src import config  # noqa: E402
 from src.nfl import live_wind  # noqa: E402
 
-MAX_LEAD = 26
+MAX_LEAD = live_wind.TASK_MAX_LEAD
 RUN_LOG = config.LIVE_DIR / "run.log"
 PICKS = config.WIND_PICKS.relative_to(ROOT).as_posix()
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)   # Windows only
