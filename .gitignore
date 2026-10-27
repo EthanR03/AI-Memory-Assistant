@@ -33,6 +33,8 @@ data/openmeteo/
 # next to it, data/live/wind_picks.csv, IS committed - see live_wind.py.
 data/live/games.csv
 data/live/*.tmp
+# One line per hourly run of scripts/run_live_picks.py; local diagnostics.
+data/live/run.log
 
 # The source PDF is ~22 MB; keep it out of git history.
 data/*.pdf

@@ -45,6 +45,8 @@ python -m src.nfl.forecast_wind
 # Live: paper-trade the frozen wind rule (WIND_RULE.md) through 2026
 python -m src.nfl.live_wind picks   # 18-36h before kickoff; commit the log
 python -m src.nfl.live_wind grade   # once the games are final
+# ...or have Windows run picks hourly and commit + push the log itself
+powershell -ExecutionPolicy Bypass -File scripts\schedule_live_picks.ps1
 
 # Optional: player bios and season stats, needed only for chat
 python -m src.nfl.players       # one 7 MB file
@@ -307,8 +309,11 @@ What is still open:
    refuses after kickoff. `grade` scores each bet against the nflverse
    close at −110 and against that logged price, and audits the live pull
    against the archived series the backtest used. Live picks start in
-   week 8. Commit the log after every run. Paid odds history is now worth
-   it only to measure CLV, not to decide whether the lead is real.
+   week 8. Commit the log after every run, or let
+   `scripts/schedule_live_picks.ps1` register an hourly Windows task that
+   pulls each game about 26 h out, commits and pushes the log, and
+   records every run in `data/live/run.log`. Paid odds history is now
+   worth it only to measure CLV, not to decide whether the lead is real.
 2. **Better features** — nflverse play-by-play carries EPA, success rate
    and CPOE, all far more predictive per-game than box-score margin.
    Still the best route to a *sides* model, which Stage 3 confirms Elo

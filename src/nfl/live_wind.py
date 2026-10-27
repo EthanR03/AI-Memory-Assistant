@@ -178,8 +178,18 @@ def write_log(rows: list[dict]) -> None:
 
 # --- picks -----------------------------------------------------------------
 
-def picks(at: datetime | None = None, dry_run: bool = False) -> None:
-    """Pull and log every outdoor game now 18-36h from kickoff."""
+def picks(at: datetime | None = None, dry_run: bool = False,
+          max_lead: float = PULL_HOURS[1]) -> list[str]:
+    """Pull and log every outdoor game now 18-36h from kickoff.
+
+    `max_lead` waits until a game is that close before pulling. The rule
+    takes the first pull anywhere in its window, so this can only narrow
+    the window, never widen it. Returns the games whose window passed
+    with no pull, which are no bet under the rule.
+    """
+    lo, hi = PULL_HOURS
+    if not lo < max_lead <= hi:
+        raise ValueError(f"max_lead must be in ({lo}, {hi}]")
     now = at or _now()
     log = read_log()
     logged = {r["game_id"] for r in log}
@@ -192,11 +202,10 @@ def picks(at: datetime | None = None, dry_run: bool = False) -> None:
         raise KeyError(f"no coordinates for {unknown} - add them to "
                        "forecast_wind.STADIUMS (that does not change the rule)")
 
-    lo, hi = PULL_HOURS
-    due = [g for g in upcoming if lo <= _lead(g, now) <= hi]
+    due = [g for g in upcoming if lo <= _lead(g, now) <= max_lead]
     missed = [g for g in upcoming if _lead(g, now) < lo]
     later = [g for g in upcoming
-             if _lead(g, now) > hi and kickoff(g) - now <= LOOKAHEAD]
+             if _lead(g, now) > max_lead and kickoff(g) - now <= LOOKAHEAD]
 
     print(f"Rule {RULE}: under when the JMA forecast is >= {THRESHOLD_MPH} "
           f"mph. Now {_local(now)} local.")
@@ -245,6 +254,7 @@ def picks(at: datetime | None = None, dry_run: bool = False) -> None:
             print(f"  {g['nflverse_game_id']:<18}"
                   f"{_local(ko - timedelta(hours=hi))}  to  "
                   f"{_local(ko - timedelta(hours=lo))}")
+    return [g["nflverse_game_id"] for g in missed]
 
 
 # --- price -----------------------------------------------------------------
@@ -362,6 +372,9 @@ if __name__ == "__main__":
     p.add_argument("--at", type=_et,
                    help="pretend it is this ET time, e.g. 2026-10-28T20:00 "
                         "(implies --dry-run; the forecast is still today's)")
+    p.add_argument("--max-lead", type=float, default=PULL_HOURS[1],
+                   help="only pull games at most this many hours out "
+                        "(18-36; narrows the rule's window, never widens it)")
 
     p = sub.add_parser("price", help="record a book's total and price on a "
                                      "bet, before kickoff")
@@ -374,7 +387,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     if args.command == "picks":
-        picks(args.at, args.dry_run or args.at is not None)
+        picks(args.at, args.dry_run or args.at is not None, args.max_lead)
     elif args.command == "price":
         price(args.game_id, args.total, args.odds, args.book)
     else:
