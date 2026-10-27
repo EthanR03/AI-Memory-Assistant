@@ -15,3 +15,7 @@ requests>=2.31
 # Stage 3: least squares for the situational tests (src/nfl/situational.py).
 # Only lstsq and some array arithmetic - no scipy, pandas or sklearn.
 numpy>=2.0
+
+# Live wind picks: kickoffs are ET, and zoneinfo has no time-zone database
+# on Windows without this (src/nfl/live_wind.py).
+tzdata>=2024.1

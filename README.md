@@ -145,7 +145,9 @@ kickoff, while the market prices a forecast. Rerun on archived 24-hour
 forecasts (Open-Meteo, JMA model, 2018–25), the slope is unchanged
 (−0.241 pts/mph, t −3.35), and the part of the kickoff wind that the
 forecast could not see explains none of it. The edge was knowable a day
-out, so it is a paper-trading candidate, not just a lead.
+out, so it is a paper-trading candidate, not just a lead. The rule is
+now frozen (`src/nfl/WIND_RULE.md`) and paper-traded live from week 8 of
+2026 by `src/nfl/live_wind.py`.
 
 `scripts/` holds the one-off exploration that shaped the schema —
 `analyze_factbook.py`, `map_team_blocks.py`, `explore_nflverse.py`,

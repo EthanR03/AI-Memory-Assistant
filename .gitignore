@@ -29,5 +29,10 @@ data/nflverse/stats/
 #   python -m src.nfl.forecast_wind
 data/openmeteo/
 
+# Live picks: the schedule is re-downloaded on every run. The pick log
+# next to it, data/live/wind_picks.csv, IS committed - see live_wind.py.
+data/live/games.csv
+data/live/*.tmp
+
 # The source PDF is ~22 MB; keep it out of git history.
 data/*.pdf

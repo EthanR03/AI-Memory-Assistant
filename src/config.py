@@ -54,6 +54,14 @@ NFLVERSE_STATS = NFLVERSE_DIR / "stats"
 # season (src/nfl/forecast_wind.py). Not committed; refetched on demand.
 OPENMETEO_DIR = DATA_DIR / "openmeteo"
 
+# Live paper-trading of the wind rule (src/nfl/live_wind.py). The pick log
+# IS committed - its git history is the proof each pick came before
+# kickoff. The schedule is a fresh nflverse download kept apart from the
+# committed games.csv, so finished 2026 scores never touch the backtests.
+LIVE_DIR = DATA_DIR / "live"
+WIND_PICKS = LIVE_DIR / "wind_picks.csv"
+LIVE_GAMES = LIVE_DIR / "games.csv"
+
 # The book's data is frozen at this date; anything later (cuts, trades,
 # injuries) is NOT in it. Worth surfacing in any answer built on it.
 FACTBOOK_AS_OF = "2026-07-14"

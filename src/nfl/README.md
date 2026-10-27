@@ -42,6 +42,10 @@ python -m src.nfl.situational
 # cached in data/openmeteo/; --offline to rerun from the cache)
 python -m src.nfl.forecast_wind
 
+# Live: paper-trade the frozen wind rule (WIND_RULE.md) through 2026
+python -m src.nfl.live_wind picks   # 18-36h before kickoff; commit the log
+python -m src.nfl.live_wind grade   # once the games are final
+
 # Optional: player bios and season stats, needed only for chat
 python -m src.nfl.players       # one 7 MB file
 python -m src.nfl.playerstats   # 54 files, ~25 MB, 1999-2025
@@ -295,12 +299,16 @@ What is still open:
 
 ## Next
 
-1. **Paper-trade the wind rule through 2026.** Pull the JMA and default
-   model day-ahead forecast each Saturday and log the under bets before
-   kickoff. The closing total still has to come from somewhere: nflverse
-   after the fact, or the free tier of The Odds API (live odds only).
-   Paid odds history is now worth it only to measure CLV, not to decide
-   whether the lead is real.
+1. **Paper-trade the wind rule through 2026 (under way).** The rule is
+   frozen in [`WIND_RULE.md`](WIND_RULE.md), committed before any 2026
+   result was read, and `live_wind.py` runs it. `picks` logs every
+   outdoor game 18–36 h before kickoff to `data/live/wind_picks.csv`.
+   `price` records the total and price a book actually offered, and
+   refuses after kickoff. `grade` scores each bet against the nflverse
+   close at −110 and against that logged price, and audits the live pull
+   against the archived series the backtest used. Live picks start in
+   week 8. Commit the log after every run. Paid odds history is now worth
+   it only to measure CLV, not to decide whether the lead is real.
 2. **Better features** — nflverse play-by-play carries EPA, success rate
    and CPOE, all far more predictive per-game than box-score margin.
    Still the best route to a *sides* model, which Stage 3 confirms Elo

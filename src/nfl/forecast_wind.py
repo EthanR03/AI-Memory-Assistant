@@ -157,11 +157,11 @@ def _cache_path(season: int):
     return config.OPENMETEO_DIR / f"previous_runs_{season}.json"
 
 
-def _request(params: dict) -> list[dict]:
+def _request(params: dict, url: str = API) -> list[dict]:
     import requests
 
     for attempt in range(4):
-        response = requests.get(API, params=params, timeout=60)
+        response = requests.get(url, params=params, timeout=60)
         if response.status_code == 429:          # minutely limit; wait it out
             time.sleep(60 * (attempt + 1))
             continue
@@ -223,26 +223,36 @@ def _save(path, cache: dict) -> None:
     path.write_text(json.dumps(cache))
 
 
-def attach(games: list[dict], hourly: dict[str, dict]) -> None:
-    """Average each forecast series over the game window, onto the row.
+def window_means(h: dict, game_date: str, gametime: str) -> dict[str, float]:
+    """Each hourly series in `h` averaged over the game window.
 
-    A series with any missing hour in the window is None for that game -
-    which is how `day1_gfs` drops out before 2024-01-19.
+    The window is the kickoff hour (ET, minutes dropped) and the three
+    after it. A series with any missing hour is left out - which is how
+    `day1_gfs` drops out before 2024-01-19. live_wind.py calls this too,
+    so the live picks and the backtest share one definition.
     """
+    kickoff = f"{game_date}T{int(gametime[:2]):02d}:00"
+    if kickoff not in h["time"]:
+        return {}
+    start = h["time"].index(kickoff)
+    out = {}
+    for key, series in h.items():
+        if key == "time":
+            continue
+        window = series[start:start + GAME_HOURS]
+        if len(window) == GAME_HOURS and None not in window:
+            out[key] = sum(window) / GAME_HOURS
+    return out
+
+
+def attach(games: list[dict], hourly: dict[str, dict]) -> None:
+    """Average each forecast series over the game window, onto the row."""
     for g in games:
         # Stage 3's sanity rules for the reading itself (71 mph etc.).
         g["wind"] = wind_mph(g)
         h = hourly.get(f"{g['game_date']}|{g['stadium']}")
-        kickoff = f"{g['game_date']}T{int(g['gametime'][:2]):02d}:00"
-        if h is None or kickoff not in h["time"]:
-            continue
-        start = h["time"].index(kickoff)
-        for key, series in h.items():
-            if key == "time":
-                continue
-            window = series[start:start + GAME_HOURS]
-            if len(window) == GAME_HOURS and None not in window:
-                g[key] = sum(window) / GAME_HOURS
+        if h is not None:
+            g.update(window_means(h, g["game_date"], g["gametime"]))
 
 
 def _residual(g: dict) -> float:
