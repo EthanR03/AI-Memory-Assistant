@@ -154,6 +154,19 @@ now frozen (`src/nfl/WIND_RULE.md`) and paper-traded live from week 8 of
 `baseline_ratings.py`. They print findings; they don't write to the
 store.
 
+## Tests
+
+```bash
+python -m unittest discover tests
+```
+
+Standard-library `unittest`, no network. The git tests need `git` on the
+PATH and build their own throwaway repo. So far the suite covers only the
+live wind picks: `live_wind.py`'s grading, threshold, DST-safe kickoffs and
+picks → price → grade cycle, and what `scripts/run_live_picks.py` commits,
+pushes and logs. The backtests' numerical code (`situational.py`'s
+`ols`, `max_vif` and walk-forward split) is not covered yet.
+
 ## What is not in git
 
 `.gitignore` keeps out the 22 MB source PDF, the extracted text,
